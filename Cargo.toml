@@ -1,0 +1,17 @@
+[package]
+name = "done"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+rquickjs = "0.11"
+swc_core = { version = "65", features = [
+    "common",
+    "ecma_ast",
+    "ecma_parser",
+    "ecma_parser_typescript",
+    "ecma_transforms_typescript",
+    "ecma_codegen",
+    "ecma_visit",
+] }

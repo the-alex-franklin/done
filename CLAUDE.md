@@ -10,7 +10,7 @@ V8's GC is a tracing GC running on background threads with write barriers. Even 
 
 - **Ref-counting (free):** QuickJS does this by default. When the last reference to an object drops, it's freed immediately and synchronously on the main thread.
 - **Cycle collector (manual):** QuickJS's cycle collector handles reference cycles (A → B → A). Done exposes this as `gc()` so you choose when it runs.
-- **`using` blocks (planned):** TypeScript 5.2's `using` keyword calls `Symbol.dispose` at end of scope. Combined with ref-counting, this gives you deterministic cleanup at a specific line of code.
+- **`using` blocks:** TypeScript 5.2's `using` keyword calls `Symbol.dispose` at end of scope. Combined with ref-counting, this gives you deterministic cleanup at a specific line of code.
 - **Arena allocation (future):** QuickJS exposes `JSMallocFunctions` — a pluggable C-level allocator. Long-term goal: allocate objects into an arena, free the whole slab at once.
 
 ## Stack
@@ -47,9 +47,9 @@ done/
 - [x] Object.prototype.toString returns JSON
 - [x] Expose `gc()` global — triggers QuickJS cycle collector via `Runtime::run_gc()`
 - [x] Expose `memoryUsage()` global — surfaces `Runtime::memory_usage()`
-- [ ] `using` block support — SWC already parses it; wire up `Symbol.dispose`
+- [x] `using` block support — SWC already parses it; wire up `Symbol.dispose`
 - [x] Basic event loop
-- [ ] File I/O (read/write)
+- [x] File I/O (read/write)
 - [ ] Module resolution
 - [ ] Arena allocation via `JSMallocFunctions` (requires C-level QuickJS fork)
 

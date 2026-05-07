@@ -12,6 +12,10 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to read {path}: {e}"))?;
 
     let js = transpiler::transpile(&source)?;
+    if env::var("DONE_PRINT_JS").is_ok() {
+        println!("{js}");
+        return Ok(());
+    }
     runtime::run(&js)?;
 
     Ok(())

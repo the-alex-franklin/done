@@ -13,15 +13,31 @@ pub fn run(js: &str) -> anyhow::Result<()> {
         setup_console(&ctx)?;
         setup_gc(&ctx)?;
         setup_timers(&ctx)?;
+        setup_swc_helpers(&ctx)?;
+        setup_fs(&ctx)?;
         ctx.eval::<(), _>(
             "Object.prototype.toString = function() { return JSON.stringify(this); };",
         )?;
-        ctx.eval::<(), _>(js)?;
+        ctx.eval::<(), _>(js).map_err(|e| js_error_to_anyhow(&ctx, e))?;
         run_event_loop(&ctx)?;
         Ok(())
     })?;
 
     Ok(())
+}
+
+fn js_error_to_anyhow(ctx: &Ctx<'_>, e: rquickjs::Error) -> rquickjs::Error {
+    if matches!(e, rquickjs::Error::Exception) {
+        if let Some(exc) = ctx.catch().as_exception() {
+            let msg = exc.message().unwrap_or_default();
+            let stack = exc.stack().unwrap_or_default();
+            eprintln!("Uncaught: {msg}");
+            if !stack.is_empty() {
+                eprintln!("{stack}");
+            }
+        }
+    }
+    e
 }
 
 // ------ event loop ------
@@ -180,6 +196,69 @@ fn run_event_loop<'js>(_ctx: &Ctx<'js>) -> rquickjs::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+// ------ swc helpers ------
+// These are runtime helpers that SWC's transforms reference. We inject them as
+// globals so that transformed code doesn't need @swc/helpers imports.
+
+fn setup_swc_helpers<'js>(ctx: &Ctx<'js>) -> rquickjs::Result<()> {
+    ctx.eval::<(), _>(include_str!("swc_helpers.js"))
+}
+
+// ------ fs ------
+
+fn io_err(ctx: Ctx<'_>, e: std::io::Error) -> rquickjs::Error {
+    ctx.throw(rquickjs::Value::from_exception(
+        rquickjs::Exception::from_message(ctx.clone(), &e.to_string())
+            .expect("failed to create exception"),
+    ))
+}
+
+fn setup_fs<'js>(ctx: &Ctx<'js>) -> rquickjs::Result<()> {
+    let globals = ctx.globals();
+    let fs = Object::new(ctx.clone())?;
+
+    fs.set(
+        "readFileSync",
+        Function::new(ctx.clone(), |ctx: Ctx<'_>, path: String| -> rquickjs::Result<String> {
+            std::fs::read_to_string(&path).map_err(|e| io_err(ctx, e))
+        })?,
+    )?;
+
+    fs.set(
+        "writeFileSync",
+        Function::new(ctx.clone(), |ctx: Ctx<'_>, path: String, data: String| -> rquickjs::Result<()> {
+            std::fs::write(&path, data.as_bytes()).map_err(|e| io_err(ctx, e))
+        })?,
+    )?;
+
+    fs.set(
+        "appendFileSync",
+        Function::new(ctx.clone(), |ctx: Ctx<'_>, path: String, data: String| -> rquickjs::Result<()> {
+            use std::io::Write;
+            std::fs::OpenOptions::new().create(true).append(true).open(&path)
+                .and_then(|mut f| f.write_all(data.as_bytes()))
+                .map_err(|e| io_err(ctx, e))
+        })?,
+    )?;
+
+    fs.set(
+        "existsSync",
+        Function::new(ctx.clone(), |path: String| -> bool {
+            std::path::Path::new(&path).exists()
+        })?,
+    )?;
+
+    fs.set(
+        "unlinkSync",
+        Function::new(ctx.clone(), |ctx: Ctx<'_>, path: String| -> rquickjs::Result<()> {
+            std::fs::remove_file(&path).map_err(|e| io_err(ctx, e))
+        })?,
+    )?;
+
+    globals.set("fs", fs)?;
     Ok(())
 }
 

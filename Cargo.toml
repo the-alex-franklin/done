@@ -12,6 +12,7 @@ swc_core = { version = "65", features = [
     "ecma_parser",
     "ecma_parser_typescript",
     "ecma_transforms_typescript",
+    "ecma_transforms_proposal",
     "ecma_codegen",
     "ecma_visit",
 ] }
